@@ -37,3 +37,56 @@ def test_transcribe_returns_text(client):
 def test_transcribe_requires_file(client):
     r = client.post("/transcribe")
     assert r.status_code == 422
+
+
+import numpy as np
+
+FAKE_AUDIO = np.zeros(16000, dtype=np.float32)
+
+
+def test_record_start_returns_recording_status(client):
+    import server
+    server._recording = False
+    with patch("server.threading.Thread"):
+        r = client.post("/record/start")
+    assert r.status_code == 200
+    assert r.json()["status"] == "recording"
+    server._recording = False
+
+
+def test_record_start_when_already_recording(client):
+    import server
+    server._recording = True
+    r = client.post("/record/start")
+    assert r.status_code == 200
+    assert r.json()["status"] == "already_recording"
+    server._recording = False
+
+
+def test_record_stop_when_not_recording(client):
+    import server
+    server._recording = False
+    r = client.post("/record/stop")
+    assert r.status_code == 200
+    assert r.json()["text"] == ""
+
+
+def test_record_stop_transcribes_audio(client):
+    import server
+    server._recording = True
+    server._audio_chunks = [FAKE_AUDIO.reshape(-1, 1)]
+    server._record_thread = None
+    with patch("server.httpx.post"):
+        r = client.post("/record/stop", json={"sync_emotion": False})
+    assert r.status_code == 200
+    assert r.json()["text"] == "hello world"
+
+
+def test_record_stop_returns_empty_on_silence(client):
+    import server
+    server._recording = True
+    server._audio_chunks = []
+    server._record_thread = None
+    r = client.post("/record/stop", json={"sync_emotion": False})
+    assert r.status_code == 200
+    assert r.json()["text"] == ""
