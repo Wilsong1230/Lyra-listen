@@ -93,10 +93,9 @@ def record_stop(req: RecordStopRequest = RecordStopRequest()):
 
     audio = np.concatenate(_audio_chunks).squeeze()
     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
-        sf.write(tmp.name, audio, RECORD_SAMPLE_RATE)
         tmp_path = tmp.name
-
     try:
+        sf.write(tmp_path, audio, RECORD_SAMPLE_RATE)
         result = _stt.transcribe(tmp_path)
         return {"text": result["text"].strip()}
     except Exception as e:

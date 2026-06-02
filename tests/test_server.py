@@ -1,4 +1,5 @@
 import io
+import numpy as np
 import pytest
 from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
@@ -38,8 +39,6 @@ def test_transcribe_requires_file(client):
     r = client.post("/transcribe")
     assert r.status_code == 422
 
-
-import numpy as np
 
 FAKE_AUDIO = np.zeros(16000, dtype=np.float32)
 
@@ -90,3 +89,16 @@ def test_record_stop_returns_empty_on_silence(client):
     r = client.post("/record/stop", json={"sync_emotion": False})
     assert r.status_code == 200
     assert r.json()["text"] == ""
+
+
+def test_record_stop_calls_idle_when_sync_emotion_true(client):
+    import server
+    server._recording = True
+    server._audio_chunks = [FAKE_AUDIO.reshape(-1, 1)]
+    server._record_thread = None
+    with patch("server.httpx.post") as mock_post:
+        r = client.post("/record/stop", json={"sync_emotion": True})
+    assert r.status_code == 200
+    mock_post.assert_called_once()
+    call_kwargs = mock_post.call_args
+    assert "idle" in str(call_kwargs)
