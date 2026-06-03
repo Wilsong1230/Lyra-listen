@@ -29,6 +29,7 @@ _running = False
 _thread: threading.Thread | None = None
 _detections_today = 0
 _detection_date = date.today()
+_lock = threading.Lock()
 
 
 @asynccontextmanager
@@ -68,15 +69,23 @@ def _increment_counter() -> None:
 
 def _loop() -> None:
     global _running
-    with sd.InputStream(samplerate=SAMPLE_RATE, channels=1, dtype="int16",
-                        blocksize=FRAME_SIZE) as stream:
-        while _running:
-            data, _ = stream.read(FRAME_SIZE)
-            scores = _model.predict(data.squeeze())
-            if any(v >= WAKEWORD_THRESHOLD for v in scores.values()):
-                _fire(f"{LISTEN_URL}/activate", {})
-                _fire(f"{EMBODIMENT_URL}/state", {"state": "curious"})
-                _increment_counter()
+    if _model is None:
+        _running = False
+        return
+    try:
+        with sd.InputStream(samplerate=SAMPLE_RATE, channels=1, dtype="int16",
+                            blocksize=FRAME_SIZE) as stream:
+            while _running:
+                data, _ = stream.read(FRAME_SIZE)
+                scores = _model.predict(data.squeeze())
+                if any(v >= WAKEWORD_THRESHOLD for v in scores.values()):
+                    _fire(f"{LISTEN_URL}/activate", {})
+                    _fire(f"{EMBODIMENT_URL}/state", {"state": "curious"})
+                    _increment_counter()
+    except Exception as e:
+        print(f"[wakeword] audio error: {e} — stopping", flush=True)
+    finally:
+        _running = False
 
 
 @app.get("/wakeword/status")
@@ -89,9 +98,10 @@ def wakeword_start():
     global _running, _thread
     if _model is None:
         return {"status": "error", "detail": "model not loaded"}
-    if _running:
-        return {"status": "already_running"}
-    _running = True
+    with _lock:
+        if _running:
+            return {"status": "already_running"}
+        _running = True
     _thread = threading.Thread(target=_loop, daemon=True)
     _thread.start()
     return {"status": "started"}
@@ -100,7 +110,8 @@ def wakeword_start():
 @app.post("/wakeword/stop")
 def wakeword_stop():
     global _running, _thread
-    _running = False
+    with _lock:
+        _running = False
     if _thread:
         _thread.join(timeout=2.0)
     return {"status": "stopped"}
