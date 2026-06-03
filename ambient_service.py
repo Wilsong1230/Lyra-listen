@@ -33,17 +33,21 @@ _history: deque = deque(maxlen=10)
 _running = False
 _thread: threading.Thread | None = None
 _stt_warned = False
+_lock = threading.Lock()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global _yamnet, _class_names
-    _yamnet = hub.load("https://tfhub.dev/google/yamnet/1")
-    raw = urllib.request.urlopen(
-        "https://raw.githubusercontent.com/tensorflow/models/master/"
-        "research/audioset/yamnet/yamnet_class_map.csv"
-    ).read().decode()
-    _class_names = [row["display_name"] for row in csv.DictReader(io.StringIO(raw))]
-    print(f"[ambient] ready  classes={len(_class_names)}", flush=True)
+    try:
+        _yamnet = hub.load("https://tfhub.dev/google/yamnet/1")
+        raw = urllib.request.urlopen(
+            "https://raw.githubusercontent.com/tensorflow/models/master/"
+            "research/audioset/yamnet/yamnet_class_map.csv"
+        ).read().decode()
+        _class_names = [row["display_name"] for row in csv.DictReader(io.StringIO(raw))]
+        print(f"[ambient] ready  classes={len(_class_names)}", flush=True)
+    except Exception as e:
+        print(f"[ambient] startup failed: {e} — service will run but produce no detections", flush=True)
     yield
 
 app = FastAPI(lifespan=lifespan)
@@ -99,18 +103,18 @@ def get_history():
 @app.post("/ambient/start")
 def start_ambient():
     global _running, _thread
-    if _running:
-        return {"status": "already_running"}
-    _running = True
+    with _lock:
+        if _running:
+            return {"status": "already_running"}
+        _running = True
     _thread = threading.Thread(target=_loop, daemon=True)
     _thread.start()
     return {"status": "started"}
-
-
 @app.post("/ambient/stop")
 def stop_ambient():
     global _running, _thread
-    _running = False
+    with _lock:
+        _running = False
     if _thread:
         _thread.join(timeout=3.0)
     return {"status": "stopped"}
