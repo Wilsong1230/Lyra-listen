@@ -40,6 +40,11 @@ def health():
     return {"status": "ok", "stt_model": WHISPER_MODEL_NAME, "recording": _recording}
 
 
+@app.get("/status")
+def status():
+    return {"recording": _recording}
+
+
 @app.post("/transcribe")
 async def transcribe(file: UploadFile):
     data = await file.read()

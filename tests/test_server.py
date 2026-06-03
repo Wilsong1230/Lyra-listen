@@ -102,3 +102,11 @@ def test_record_stop_calls_idle_when_sync_emotion_true(client):
     mock_post.assert_called_once()
     call_kwargs = mock_post.call_args
     assert "idle" in str(call_kwargs)
+
+
+def test_status_returns_recording_false_when_idle(client):
+    import server
+    server._recording = False
+    r = client.get("/status")
+    assert r.status_code == 200
+    assert r.json() == {"recording": False}
