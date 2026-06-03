@@ -78,7 +78,7 @@ def _loop():
         t0 = time.monotonic()
         audio = sd.rec(SAMPLE_RATE, samplerate=SAMPLE_RATE, channels=1,
                        dtype="float32", blocking=True).squeeze()
-        if not _stt_active():
+        if _yamnet is not None and not _stt_active():
             scores, _, _ = _yamnet(audio)
             mean_scores = scores.numpy().mean(axis=0)
             top_idx = int(mean_scores.argmax())
