@@ -110,3 +110,27 @@ def test_status_returns_recording_false_when_idle(client):
     r = client.get("/status")
     assert r.status_code == 200
     assert r.json() == {"recording": False}
+
+
+def test_activate_starts_recording(client):
+    import server
+    server._recording = False
+    with patch("server.threading.Thread"), \
+         patch("server.httpx.post") as mock_post:
+        r = client.post("/activate")
+    assert r.status_code == 200
+    assert r.json()["status"] == "recording"
+    mock_post.assert_called_once()
+    assert "listening" in str(mock_post.call_args)
+    server._recording = False
+
+
+def test_activate_when_already_recording(client):
+    import server
+    server._recording = True
+    with patch("server.httpx.post") as mock_post:
+        r = client.post("/activate")
+    assert r.status_code == 200
+    assert r.json()["status"] == "already_recording"
+    mock_post.assert_not_called()
+    server._recording = False

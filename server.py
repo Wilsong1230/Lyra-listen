@@ -45,6 +45,17 @@ def status():
     return {"recording": _recording}
 
 
+@app.post("/activate")
+def activate():
+    result = record_start()
+    if result["status"] == "recording":
+        try:
+            httpx.post(f"{EMBODIMENT_URL}/state", json={"state": "listening"}, timeout=2)
+        except Exception:
+            pass
+    return result
+
+
 @app.post("/transcribe")
 async def transcribe(file: UploadFile):
     data = await file.read()
