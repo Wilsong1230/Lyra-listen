@@ -34,7 +34,6 @@ _running = False
 _thread: threading.Thread | None = None
 _stt_warned = False
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global _yamnet, _class_names
@@ -47,7 +46,6 @@ async def lifespan(app: FastAPI):
     print(f"[ambient] ready  classes={len(_class_names)}", flush=True)
     yield
 
-
 app = FastAPI(lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
@@ -59,7 +57,6 @@ def _match_label(name: str) -> str | None:
             return label
     return None
 
-
 def _stt_active() -> bool:
     global _stt_warned
     try:
@@ -70,7 +67,6 @@ def _stt_active() -> bool:
             print("[ambient] /status unavailable — STT pause disabled", flush=True)
             _stt_warned = True
         return False
-
 
 def _loop():
     global _latest, _running
@@ -92,16 +88,13 @@ def _loop():
                     _history.append(entry)
         time.sleep(max(0.0, 1.0 - (time.monotonic() - t0)))
 
-
 @app.get("/ambient")
 def get_ambient():
     return _latest or {"sound": None}
 
-
 @app.get("/ambient/history")
 def get_history():
     return {"history": list(_history)}
-
 
 @app.post("/ambient/start")
 def start_ambient():
